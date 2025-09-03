@@ -1,0 +1,118 @@
+<!-- templates/dashboard.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>Dashboard</h2>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ total_assets }}</h4>
+                        <p class="mb-0">Total Assets</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-solar-panel fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ in_service }}</h4>
+                        <p class="mb-0">In Service</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-check-circle fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-warning">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ under_repair }}</h4>
+                        <p class="mb-0">Under Repair</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-tools fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4>{{ returned }}</h4>
+                        <p class="mb-0">Returned</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-undo fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Asset Updates</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Serial Number</th>
+                                <th>Type</th>
+                                <th>Status</th>
+                                <th>Location</th>
+                                <th>Last Updated</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for asset in recent_assets %}
+                            <tr>
+                                <td>{{ asset.serial_number }}</td>
+                                <td>{{ asset.asset_type }}</td>
+                                <td>
+                                    <span class="badge bg-{% if asset.status == 'In Service' %}success{% elif asset.status == 'Under Repair' %}warning{% else %}info{% endif %}">
+                                        {{ asset.status }}
+                                    </span>
+                                </td>
+                                <td>{{ asset.location or 'N/A' }}</td>
+                                <td>{{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                <td>
+                                    <a href="{{ url_for('asset_detail', id=asset.id) }}" class="btn btn-sm btn-primary">View</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

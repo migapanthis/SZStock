@@ -1,0 +1,128 @@
+<!-- templates/asset_detail.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2>Asset Details</h2>
+            <div>
+                <a href="{{ url_for('edit_asset', id=asset.id) }}" class="btn btn-warning">
+                    <i class="fas fa-edit"></i> Edit
+                </a>
+                <a href="{{ url_for('assets') }}" class="btn btn-secondary">Back to Assets</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5>Asset Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Serial Number:</strong><br>
+                        <span class="text-primary fs-5">{{ asset.serial_number }}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Asset Type:</strong><br>
+                        {{ asset.asset_type }}
+                    </div>
+                </div>
+                <hr>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Manufacturer:</strong><br>
+                        {{ asset.manufacturer or 'N/A' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Model:</strong><br>
+                        {{ asset.model or 'N/A' }}
+                    </div>
+                </div>
+                <hr>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Status:</strong><br>
+                        <span class="badge bg-{% if asset.status == 'In Service' %}success{% elif asset.status == 'Under Repair' %}warning{% else %}info{% endif %} fs-6">
+                            {{ asset.status }}
+                        </span>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Location:</strong><br>
+                        {{ asset.location or 'N/A' }}
+                    </div>
+                </div>
+                <hr>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Install Date:</strong><br>
+                        {{ asset.install_date.strftime('%Y-%m-%d') if asset.install_date else 'N/A' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Warranty Expiry:</strong><br>
+                        {{ asset.warranty_expiry.strftime('%Y-%m-%d') if asset.warranty_expiry else 'N/A' }}
+                    </div>
+                </div>
+                
+                {% if asset.notes %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Notes:</strong><br>
+                        <p class="text-muted">{{ asset.notes }}</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <hr>
+                <div class="row">
+                    <div class="col-md-6">
+                        <strong>Created:</strong><br>
+                        <small class="text-muted">{{ asset.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Last Updated:</strong><br>
+                        <small class="text-muted">{{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Recent Activity</h5>
+            </div>
+            <div class="card-body">
+                {% if audit_logs %}
+                    {% for log in audit_logs %}
+                    <div class="border-start border-primary ps-3 mb-3">
+                        <div class="fw-bold">{{ log.action }}</div>
+                        <small class="text-muted">
+                            By {{ log.user.username }} - {{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                        </small>
+                        {% if log.old_values %}
+                        <div class="mt-1">
+                            <small class="text-danger">From: {{ log.old_values }}</small><br>
+                            <small class="text-success">To: {{ log.new_values }}</small>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">No activity recorded</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

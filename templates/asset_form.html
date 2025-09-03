@@ -1,0 +1,112 @@
+<!-- templates/asset_form.html -->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h2>{% if asset %}Edit Asset{% else %}Add New Asset{% endif %}</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="serial_number" class="form-label">Serial Number *</label>
+                                <input type="text" class="form-control" name="serial_number" 
+                                       value="{{ asset.serial_number if asset }}" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="asset_type" class="form-label">Asset Type *</label>
+                                <select class="form-select" name="asset_type" required>
+                                    <option value="">Select Type</option>
+                                    <option value="Solar Panel" {% if asset and asset.asset_type == 'Solar Panel' %}selected{% endif %}>Solar Panel</option>
+                                    <option value="Battery" {% if asset and asset.asset_type == 'Battery' %}selected{% endif %}>Battery</option>
+                                    <option value="Inverter" {% if asset and asset.asset_type == 'Inverter' %}selected{% endif %}>Inverter</option>
+                                    <option value="Charge Controller" {% if asset and asset.asset_type == 'Charge Controller' %}selected{% endif %}>Charge Controller</option>
+                                    <option value="Monitoring System" {% if asset and asset.asset_type == 'Monitoring System' %}selected{% endif %}>Monitoring System</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="manufacturer" class="form-label">Manufacturer</label>
+                                <input type="text" class="form-control" name="manufacturer" 
+                                       value="{{ asset.manufacturer if asset }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="model" class="form-label">Model</label>
+                                <input type="text" class="form-control" name="model" 
+                                       value="{{ asset.model if asset }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="status" class="form-label">Status *</label>
+                                <select class="form-select" name="status" required>
+                                    <option value="In Service" {% if asset and asset.status == 'In Service' %}selected{% endif %}>In Service</option>
+                                    <option value="Returned" {% if asset and asset.status == 'Returned' %}selected{% endif %}>Returned</option>
+                                    <option value="Under Repair" {% if asset and asset.status == 'Under Repair' %}selected{% endif %}>Under Repair</option>
+                                    <option value="Decommissioned" {% if asset and asset.status == 'Decommissioned' %}selected{% endif %}>Decommissioned</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="location" class="form-label">Location</label>
+                                <input type="text" class="form-control" name="location" 
+                                       value="{{ asset.location if asset }}" 
+                                       placeholder="Customer address or warehouse location">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="install_date" class="form-label">Install Date</label>
+                                <input type="date" class="form-control" name="install_date" 
+                                       value="{{ asset.install_date.strftime('%Y-%m-%d') if asset and asset.install_date }}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="warranty_expiry" class="form-label">Warranty Expiry</label>
+                                <input type="date" class="form-control" name="warranty_expiry" 
+                                       value="{{ asset.warranty_expiry.strftime('%Y-%m-%d') if asset and asset.warranty_expiry }}">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="notes" class="form-label">Notes</label>
+                        <textarea class="form-control" name="notes" rows="3" 
+                                  placeholder="Additional notes about this asset">{{ asset.notes if asset }}</textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success">
+                            {% if asset %}Update Asset{% else %}Create Asset{% endif %}
+                        </button>
+                        <a href="{{ url_for('assets') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
