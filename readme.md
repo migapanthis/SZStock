@@ -50,7 +50,7 @@ A web-based application for managing solar PV panels, batteries, inverters, and 
 - **Export Data**: Download Excel reports for external use
 
 ### User Management
-- **Multi-Company Support**: Separate access for your warehousing partners
+- **Multi-Company Support**: Separate access for warehousing partners
 - **Role-Based Access**: Admin users can view audit trails
 - **Secure Authentication**: Password hashing and session management
 
@@ -112,14 +112,6 @@ Edit the asset form template and add new options to the asset type dropdown.
 3. **Web Server**: Use Gunicorn + Nginx instead of Flask dev server
 4. **HTTPS**: Enable SSL/TLS encryption
 5. **Backups**: Set up automated database backups
-
-### Quick Heroku Deployment
-```bash
-# Install Heroku CLI, then:
-heroku create your-app-name
-git push heroku main
-heroku run python app.py
-```
 
 ## Contributing
 
