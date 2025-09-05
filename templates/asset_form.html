@@ -1,4 +1,4 @@
-<!-- templates/asset_form.html -->
+<!-- templates/asset_form.html - Updated with new fields -->
 {% extends "base.html" %}
 
 {% block content %}
@@ -9,7 +9,7 @@
 </div>
 
 <div class="row">
-    <div class="col-md-8">
+    <div class="col-md-10">
         <div class="card">
             <div class="card-body">
                 <form method="POST">
@@ -26,11 +26,12 @@
                                 <label for="asset_type" class="form-label">Asset Type *</label>
                                 <select class="form-select" name="asset_type" required>
                                     <option value="">Select Type</option>
-                                    <option value="Solar Panel" {% if asset and asset.asset_type == 'Solar Panel' %}selected{% endif %}>Solar Panel</option>
-                                    <option value="Battery" {% if asset and asset.asset_type == 'Battery' %}selected{% endif %}>Battery</option>
-                                    <option value="Inverter" {% if asset and asset.asset_type == 'Inverter' %}selected{% endif %}>Inverter</option>
-                                    <option value="Charge Controller" {% if asset and asset.asset_type == 'Charge Controller' %}selected{% endif %}>Charge Controller</option>
-                                    <option value="Monitoring System" {% if asset and asset.asset_type == 'Monitoring System' %}selected{% endif %}>Monitoring System</option>
+                                    {% for asset_type_option in ASSET_TYPE_OPTIONS %}
+                                    <option value="{{ asset_type_option }}" 
+                                        {% if asset and asset.asset_type == asset_type_option %}selected{% endif %}>
+                                        {{ asset_type_option }}
+                                    </option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
@@ -39,33 +40,28 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="manufacturer" class="form-label">Manufacturer</label>
-                                <input type="text" class="form-control" name="manufacturer" 
-                                       value="{{ asset.manufacturer if asset }}">
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="mb-3">
                                 <label for="model" class="form-label">Model</label>
                                 <input type="text" class="form-control" name="model" 
                                        value="{{ asset.model if asset }}">
                             </div>
                         </div>
-                    </div>
-
-                    <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="status" class="form-label">Status *</label>
                                 <select class="form-select" name="status" required>
-                                    <option value="In Service" {% if asset and asset.status == 'In Service' %}selected{% endif %}>In Service</option>
-                                    <option value="Returned" {% if asset and asset.status == 'Returned' %}selected{% endif %}>Returned</option>
-                                    <option value="Under Repair" {% if asset and asset.status == 'Under Repair' %}selected{% endif %}>Under Repair</option>
-                                    <option value="Decommissioned" {% if asset and asset.status == 'Decommissioned' %}selected{% endif %}>Decommissioned</option>
+                                    {% for status_option in STATUS_OPTIONS %}
+                                    <option value="{{ status_option }}" 
+                                        {% if asset and asset.status == status_option %}selected{% endif %}>
+                                        {{ status_option }}
+                                    </option>
+                                    {% endfor %}
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-6">
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12">
                             <div class="mb-3">
                                 <label for="location" class="form-label">Location</label>
                                 <input type="text" class="form-control" name="location" 
@@ -76,33 +72,56 @@
                     </div>
 
                     <div class="row">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="install_date" class="form-label">Install Date</label>
-                                <input type="date" class="form-control" name="install_date" 
-                                       value="{{ asset.install_date.strftime('%Y-%m-%d') if asset and asset.install_date }}">
+                                <label for="received_date" class="form-label">Received Date</label>
+                                <input type="date" class="form-control" name="received_date" 
+                                       value="{{ asset.received_date.strftime('%Y-%m-%d') if asset and asset.received_date }}">
                             </div>
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <div class="mb-3">
-                                <label for="warranty_expiry" class="form-label">Warranty Expiry</label>
-                                <input type="date" class="form-control" name="warranty_expiry" 
-                                       value="{{ asset.warranty_expiry.strftime('%Y-%m-%d') if asset and asset.warranty_expiry }}">
+                                <label for="dispatched_to_fsp_date" class="form-label">Dispatched to FSP Date</label>
+                                <input type="date" class="form-control" name="dispatched_to_fsp_date" 
+                                       value="{{ asset.dispatched_to_fsp_date.strftime('%Y-%m-%d') if asset and asset.dispatched_to_fsp_date }}">
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="dispatched_to_panasonic_date" class="form-label">Dispatched to Panasonic Date</label>
+                                <input type="date" class="form-control" name="dispatched_to_panasonic_date" 
+                                       value="{{ asset.dispatched_to_panasonic_date.strftime('%Y-%m-%d') if asset and asset.dispatched_to_panasonic_date }}">
                             </div>
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label for="notes" class="form-label">Notes</label>
-                        <textarea class="form-control" name="notes" rows="3" 
-                                  placeholder="Additional notes about this asset">{{ asset.notes if asset }}</textarea>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="sc_number" class="form-label">SC Number <small class="text-muted">(optional)</small></label>
+                                <input type="text" class="form-control" name="sc_number" 
+                                       value="{{ asset.sc_number if asset }}" 
+                                       placeholder="SC-xx-xxxxxx">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="job_number" class="form-label">Job Number <small class="text-muted">(optional)</small></label>
+                                <input type="text" class="form-control" name="job_number" 
+                                       value="{{ asset.job_number if asset }}" 
+                                       placeholder="L000">
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mt-4">
                         <button type="submit" class="btn btn-success">
+                            <i class="fas fa-save"></i> 
                             {% if asset %}Update Asset{% else %}Create Asset{% endif %}
                         </button>
-                        <a href="{{ url_for('assets') }}" class="btn btn-secondary">Cancel</a>
+                        <a href="{{ url_for('assets') }}" class="btn btn-secondary">
+                            <i class="fas fa-times"></i> Cancel
+                        </a>
                     </div>
                 </form>
             </div>
