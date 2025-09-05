@@ -152,6 +152,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [ ] Integration with SolarZero commissioning app
 - [ ] Barcode/QR code scanning
-- [ ] Integration with manufacturer APIs
 - [ ] Advanced reporting and analytics
-- [ ] Bulk import/export functionality
+- [ ] Bulk import functionality
+- [ ] Visibility of parts with FSPs
