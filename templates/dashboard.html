@@ -1,4 +1,4 @@
-<!-- templates/dashboard.html -->
+<!-- templates/dashboard.html - Fixed template variables -->
 {% extends "base.html" %}
 
 {% block content %}
@@ -29,8 +29,8 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4>{{ in_service }}</h4>
-                        <p class="mb-0">In Service</p>
+                        <h4>{{ deployed }}</h4>
+                        <p class="mb-0">Deployed</p>
                     </div>
                     <div class="align-self-center">
                         <i class="fas fa-check-circle fa-2x"></i>
@@ -44,11 +44,11 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4>{{ under_repair }}</h4>
-                        <p class="mb-0">Under Repair</p>
+                        <h4>{{ faulty_awaiting }}</h4>
+                        <p class="mb-0">Faulty</p>
                     </div>
                     <div class="align-self-center">
-                        <i class="fas fa-tools fa-2x"></i>
+                        <i class="fas fa-exclamation-triangle fa-2x"></i>
                     </div>
                 </div>
             </div>
@@ -59,11 +59,60 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between">
                     <div>
-                        <h4>{{ returned }}</h4>
-                        <p class="mb-0">Returned</p>
+                        <h4>{{ with_panasonic }}</h4>
+                        <p class="mb-0">Being Serviced</p>
                     </div>
                     <div class="align-self-center">
-                        <i class="fas fa-undo fa-2x"></i>
+                        <i class="fas fa-tools fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Additional status breakdown -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6>Service Status Breakdown</h6>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-md-2">
+                        <div class="border-end">
+                            <h5 class="text-info">{{ with_panasonic }}</h5>
+                            <small class="text-muted">With Panasonic</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border-end">
+                            <h5 class="text-info">{{ with_fsp }}</h5>
+                            <small class="text-muted">With FSP</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border-end">
+                            <h5 class="text-success">{{ repaired }}</h5>
+                            <small class="text-muted">Repaired</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border-end">
+                            <h5 class="text-danger">{{ unrepaired }}</h5>
+                            <small class="text-muted">Unrepaired</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="border-end">
+                            <h5 class="text-secondary">{{ removed }}</h5>
+                            <small class="text-muted">Removed</small>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <h5 class="text-dark">{{ disposed }}</h5>
+                        <small class="text-muted">Disposed</small>
                     </div>
                 </div>
             </div>
@@ -85,7 +134,8 @@
                                 <th>Serial Number</th>
                                 <th>Type</th>
                                 <th>Status</th>
-                                <th>Location</th>
+                                <th>SC Number</th>
+                                <th>Job Number</th>
                                 <th>Last Updated</th>
                                 <th>Actions</th>
                             </tr>
@@ -93,14 +143,23 @@
                         <tbody>
                             {% for asset in recent_assets %}
                             <tr>
-                                <td>{{ asset.serial_number }}</td>
-                                <td>{{ asset.asset_type }}</td>
+                                <td><strong>{{ asset.serial_number }}</strong></td>
                                 <td>
-                                    <span class="badge bg-{% if asset.status == 'In Service' %}success{% elif asset.status == 'Under Repair' %}warning{% else %}info{% endif %}">
+                                    <span class="badge bg-secondary">{{ asset.asset_type }}</span>
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ get_status_color(asset.status) }}">
                                         {{ asset.status }}
                                     </span>
                                 </td>
-                                <td>{{ asset.location or 'N/A' }}</td>
+                                <td>{{ asset.sc_number or 'N/A' }}</td>
+                                <td>
+                                    {% if asset.job_number %}
+                                        <span class="text-success">{{ asset.job_number }}</span>
+                                    {% else %}
+                                        <span class="text-muted">-</span>
+                                    {% endif %}
+                                </td>
                                 <td>{{ asset.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
                                 <td>
                                     <a href="{{ url_for('asset_detail', id=asset.id) }}" class="btn btn-sm btn-primary">View</a>
@@ -115,4 +174,3 @@
     </div>
 </div>
 {% endblock %}
-
