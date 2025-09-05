@@ -1,4 +1,4 @@
-<!-- templates/asset_form.html - Updated with new fields -->
+<!-- templates/asset_form.html - Updated with barcode scanner functionality -->
 {% extends "base.html" %}
 
 {% block content %}
@@ -17,8 +17,14 @@
                         <div class="col-md-6">
                             <div class="mb-3">
                                 <label for="serial_number" class="form-label">Serial Number *</label>
-                                <input type="text" class="form-control" name="serial_number" 
-                                       value="{{ asset.serial_number if asset }}" required>
+                                <div class="input-group">
+                                    <input type="text" class="form-control" id="serial_number" name="serial_number" 
+                                           value="{{ asset.serial_number if asset }}" required>
+                                    <button type="button" class="btn btn-outline-primary" id="scanButton">
+                                        <i class="fas fa-qrcode"></i> Scan
+                                    </button>
+                                </div>
+                                <small class="form-text text-muted">Enter manually or click "Scan" to use camera</small>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -98,10 +104,10 @@
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label for="sc_number" class="form-label">SC Number <small class="text-muted">(optional)</small></label>
+                                <label for="sc_number" class="form-label">SC Number</label>
                                 <input type="text" class="form-control" name="sc_number" 
                                        value="{{ asset.sc_number if asset }}" 
-                                       placeholder="SC-xx-xxxxxx">
+                                       placeholder="Service call number">
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -109,7 +115,7 @@
                                 <label for="job_number" class="form-label">Job Number <small class="text-muted">(optional)</small></label>
                                 <input type="text" class="form-control" name="job_number" 
                                        value="{{ asset.job_number if asset }}" 
-                                       placeholder="L000">
+                                       placeholder="Can be added later">
                             </div>
                         </div>
                     </div>
@@ -128,4 +134,255 @@
         </div>
     </div>
 </div>
+
+<!-- Barcode Scanner Modal -->
+<div class="modal fade" id="scannerModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Barcode Scanner</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div id="scannerContainer" class="text-center">
+                    <div id="scanner-status" class="mb-3">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Loading camera...</span>
+                        </div>
+                        <p>Starting camera...</p>
+                    </div>
+                    <video id="scanner" style="width: 100%; max-width: 500px; height: auto;"></video>
+                    <div id="scanner-error" class="alert alert-danger d-none" role="alert">
+                        <h6>Camera Error</h6>
+                        <p id="error-message"></p>
+                        <small>Make sure you have given camera permissions and are using HTTPS (required for camera access).</small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <p class="text-muted">
+                        <i class="fas fa-info-circle"></i>
+                        Point your camera at a barcode or QR code. The scan will happen automatically when a code is detected.
+                    </p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="torchButton" disabled>
+                    <i class="fas fa-flashlight"></i> Toggle Flashlight
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const scanButton = document.getElementById('scanButton');
+    const scannerModal = new bootstrap.Modal(document.getElementById('scannerModal'));
+    const serialNumberInput = document.getElementById('serial_number');
+    const scannerVideo = document.getElementById('scanner');
+    const scannerStatus = document.getElementById('scanner-status');
+    const scannerError = document.getElementById('scanner-error');
+    const errorMessage = document.getElementById('error-message');
+    const torchButton = document.getElementById('torchButton');
+    
+    let isScanning = false;
+    let stream = null;
+    let track = null;
+
+    scanButton.addEventListener('click', function() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Camera access is not supported in this browser. Please use a modern browser with HTTPS.');
+            return;
+        }
+        
+        scannerModal.show();
+        startScanner();
+    });
+
+    // Handle modal close
+    document.getElementById('scannerModal').addEventListener('hidden.bs.modal', function() {
+        stopScanner();
+    });
+
+    function startScanner() {
+        scannerStatus.style.display = 'block';
+        scannerError.classList.add('d-none');
+        scannerVideo.style.display = 'none';
+        
+        // Reset torch button
+        torchButton.disabled = true;
+        
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: { ideal: 'environment' }, // Prefer back camera
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            }
+        })
+        .then(function(mediaStream) {
+            stream = mediaStream;
+            track = stream.getVideoTracks()[0];
+            
+            // Check if torch is available
+            if (track && track.getCapabilities && track.getCapabilities().torch) {
+                torchButton.disabled = false;
+            }
+            
+            scannerVideo.srcObject = stream;
+            scannerVideo.play();
+            
+            scannerStatus.style.display = 'none';
+            scannerVideo.style.display = 'block';
+            
+            // Initialize Quagga for barcode scanning
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: scannerVideo,
+                    constraints: {
+                        width: 640,
+                        height: 480,
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "code_128_reader",
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_39_reader",
+                        "code_39_vin_reader",
+                        "codabar_reader",
+                        "upc_reader",
+                        "upc_e_reader",
+                        "i2of5_reader"
+                    ]
+                },
+                locate: true,
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                }
+            }, function(err) {
+                if (err) {
+                    console.error('Quagga initialization failed:', err);
+                    showError('Barcode scanner initialization failed: ' + err.message);
+                    return;
+                }
+                
+                isScanning = true;
+                Quagga.start();
+                
+                // Add detection handler
+                Quagga.onDetected(function(result) {
+                    if (result && result.codeResult && result.codeResult.code) {
+                        const scannedCode = result.codeResult.code;
+                        
+                        // Vibrate if available
+                        if (navigator.vibrate) {
+                            navigator.vibrate(200);
+                        }
+                        
+                        // Fill the serial number field
+                        serialNumberInput.value = scannedCode;
+                        
+                        // Show success and close modal
+                        showSuccess('Barcode scanned successfully: ' + scannedCode);
+                        scannerModal.hide();
+                    }
+                });
+            });
+        })
+        .catch(function(error) {
+            console.error('Camera access denied:', error);
+            let message = 'Unable to access camera. ';
+            
+            if (error.name === 'NotAllowedError') {
+                message += 'Please allow camera permissions and try again.';
+            } else if (error.name === 'NotFoundError') {
+                message += 'No camera found on this device.';
+            } else if (error.name === 'NotSupportedError') {
+                message += 'Camera not supported in this browser.';
+            } else {
+                message += error.message;
+            }
+            
+            showError(message);
+        });
+    }
+
+    function stopScanner() {
+        if (isScanning) {
+            Quagga.stop();
+            isScanning = false;
+        }
+        
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+            stream = null;
+            track = null;
+        }
+        
+        scannerVideo.srcObject = null;
+        torchButton.disabled = true;
+    }
+
+    function showError(message) {
+        scannerStatus.style.display = 'none';
+        scannerVideo.style.display = 'none';
+        errorMessage.textContent = message;
+        scannerError.classList.remove('d-none');
+    }
+
+    function showSuccess(message) {
+        // Create a temporary success alert
+        const alert = document.createElement('div');
+        alert.className = 'alert alert-success alert-dismissible fade show position-fixed';
+        alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+        alert.innerHTML = `
+            ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alert);
+        
+        // Auto remove after 5 seconds
+        setTimeout(() => {
+            if (alert.parentNode) {
+                alert.remove();
+            }
+        }, 5000);
+    }
+
+    // Torch toggle functionality
+    torchButton.addEventListener('click', function() {
+        if (track && track.getCapabilities && track.getCapabilities().torch) {
+            const currentConstraints = track.getConstraints();
+            const torchOn = currentConstraints.advanced && 
+                           currentConstraints.advanced[0] && 
+                           currentConstraints.advanced[0].torch;
+            
+            track.applyConstraints({
+                advanced: [{
+                    torch: !torchOn
+                }]
+            }).then(() => {
+                torchButton.innerHTML = torchOn ? 
+                    '<i class="fas fa-lightbulb"></i> Toggle Flashlight' : 
+                    '<i class="fas fa-lightbulb"></i> Flashlight On';
+            }).catch((error) => {
+                console.error('Error toggling torch:', error);
+            });
+        }
+    });
+
+    // Handle browser back button or page refresh
+    window.addEventListener('beforeunload', function() {
+        stopScanner();
+    });
+});
+</script>
+
 {% endblock %}
