@@ -76,11 +76,11 @@ A web-based application for managing solar PV panels, batteries, inverters, and 
 
 ```
 solar-asset-management/
-├── app.py                 # Main Flask application
+├── solar-asset-app.py     # Main Flask application
 ├── requirements.txt       # Python dependencies
-├── README.md             # This file
-├── .gitignore           # Git ignore rules
-├── templates/           # HTML templates
+├── README.md              # This file
+├── .gitignore             # Git ignore rules
+├── templates/             # HTML templates
 │   ├── base.html
 │   ├── dashboard.html
 │   ├── assets.html
