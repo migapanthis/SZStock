@@ -1,4 +1,4 @@
-<!-- templates/asset_detail.html -->
+<!-- templates/asset_detail.html - Updated with new fields -->
 {% extends "base.html" %}
 
 {% block content %}
@@ -30,31 +30,27 @@
                     </div>
                     <div class="col-md-6">
                         <strong>Asset Type:</strong><br>
-                        {{ asset.asset_type }}
+                        <span class="badge bg-info fs-6">{{ asset.asset_type }}</span>
                     </div>
                 </div>
                 <hr>
                 
                 <div class="row">
                     <div class="col-md-6">
-                        <strong>Manufacturer:</strong><br>
-                        {{ asset.manufacturer or 'N/A' }}
-                    </div>
-                    <div class="col-md-6">
                         <strong>Model:</strong><br>
                         {{ asset.model or 'N/A' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Status:</strong><br>
+                        <span class="badge bg-{{ get_status_color(asset.status) }} fs-6">
+                            {{ asset.status }}
+                        </span>
                     </div>
                 </div>
                 <hr>
 
                 <div class="row">
-                    <div class="col-md-6">
-                        <strong>Status:</strong><br>
-                        <span class="badge bg-{% if asset.status == 'In Service' %}success{% elif asset.status == 'Under Repair' %}warning{% else %}info{% endif %} fs-6">
-                            {{ asset.status }}
-                        </span>
-                    </div>
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <strong>Location:</strong><br>
                         {{ asset.location or 'N/A' }}
                     </div>
@@ -62,25 +58,35 @@
                 <hr>
 
                 <div class="row">
-                    <div class="col-md-6">
-                        <strong>Install Date:</strong><br>
-                        {{ asset.install_date.strftime('%Y-%m-%d') if asset.install_date else 'N/A' }}
+                    <div class="col-md-4">
+                        <strong>Received Date:</strong><br>
+                        {{ asset.received_date.strftime('%Y-%m-%d') if asset.received_date else 'N/A' }}
                     </div>
-                    <div class="col-md-6">
-                        <strong>Warranty Expiry:</strong><br>
-                        {{ asset.warranty_expiry.strftime('%Y-%m-%d') if asset.warranty_expiry else 'N/A' }}
+                    <div class="col-md-4">
+                        <strong>Dispatched to FSP:</strong><br>
+                        {{ asset.dispatched_to_fsp_date.strftime('%Y-%m-%d') if asset.dispatched_to_fsp_date else 'N/A' }}
+                    </div>
+                    <div class="col-md-4">
+                        <strong>Dispatched to Panasonic:</strong><br>
+                        {{ asset.dispatched_to_panasonic_date.strftime('%Y-%m-%d') if asset.dispatched_to_panasonic_date else 'N/A' }}
                     </div>
                 </div>
-                
-                {% if asset.notes %}
                 <hr>
+
                 <div class="row">
-                    <div class="col-12">
-                        <strong>Notes:</strong><br>
-                        <p class="text-muted">{{ asset.notes }}</p>
+                    <div class="col-md-6">
+                        <strong>SC Number:</strong><br>
+                        {{ asset.sc_number or 'N/A' }}
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Job Number:</strong><br>
+                        {% if asset.job_number %}
+                            <span class="text-success">{{ asset.job_number }}</span>
+                        {% else %}
+                            <span class="text-muted">Not assigned</span>
+                        {% endif %}
                     </div>
                 </div>
-                {% endif %}
 
                 <hr>
                 <div class="row">
@@ -121,6 +127,36 @@
                 {% else %}
                     <p class="text-muted">No activity recorded</p>
                 {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Actions Card -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6>Quick Actions</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    {% if not asset.job_number %}
+                    <small class="text-muted mb-2">
+                        <i class="fas fa-info-circle"></i> Job number can be added when editing
+                    </small>
+                    {% endif %}
+                    
+                    {% if asset.status == 'Faulty awaiting dispatch to Panasonic' %}
+                    <small class="text-info">
+                        <i class="fas fa-clock"></i> Ready for Panasonic dispatch
+                    </small>
+                    {% elif asset.status == 'With Panasonic for servicing' %}
+                    <small class="text-info">
+                        <i class="fas fa-tools"></i> Currently being serviced
+                    </small>
+                    {% elif asset.status == 'Repaired' %}
+                    <small class="text-success">
+                        <i class="fas fa-check"></i> Repair completed
+                    </small>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
