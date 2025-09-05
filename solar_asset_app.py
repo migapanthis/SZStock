@@ -1,4 +1,4 @@
-# app.py - Main Flask Application
+# updated_solar_app.py - Updated with automatic migration
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -7,6 +7,7 @@ from datetime import datetime
 import pandas as pd
 import io
 import os
+import sqlite3
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-change-this-in-production'
@@ -18,6 +19,42 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Asset type options
+ASSET_TYPE_OPTIONS = [
+    'Panel',
+    'Inverter',
+    'Battery',
+    'Monitoring',
+    'Other'
+]
+
+# Status options (added "With FSP")
+STATUS_OPTIONS = [
+    'Faulty awaiting RA',
+    'Faulty awaiting dispatch to Panasonic',
+    'With Panasonic for servicing',
+    'With FSP',
+    'Repaired',
+    'Unrepaired',
+    'Removed (assumed working condition)',
+    'Disposed',
+    'Deployed'
+]
+
+# Status color mapping for badges
+STATUS_COLORS = {
+    'Faulty awaiting RA': 'warning',
+    'Faulty awaiting dispatch to Panasonic': 'warning',
+    'With Panasonic for servicing': 'info',
+    'With FSP': 'info',
+    'Repaired': 'success',
+    'Unrepaired': 'danger',
+    'Removed (assumed working condition)': 'secondary',
+    'Disposed': 'dark',
+    'Deployed': 'primary'
+}
+
+
 # Models
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -28,19 +65,23 @@ class User(UserMixin, db.Model):
     company = db.Column(db.String(100))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+
 class Asset(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     serial_number = db.Column(db.String(100), unique=True, nullable=False)
-    asset_type = db.Column(db.String(50), nullable=False)  # 'Solar Panel', 'Battery', etc.
-    manufacturer = db.Column(db.String(100))
+    asset_type = db.Column(db.String(50), nullable=False)  # Panel, Inverter, Battery, Monitoring, Other
     model = db.Column(db.String(100))
-    status = db.Column(db.String(50), default='In Service')  # 'In Service', 'Returned', 'Under Repair', etc.
-    location = db.Column(db.String(200))  # Customer address or warehouse
-    install_date = db.Column(db.Date)
-    warranty_expiry = db.Column(db.Date)
-    notes = db.Column(db.Text)
+    status = db.Column(db.String(50), default='Deployed')
+    location = db.Column(db.String(200))
+    received_date = db.Column(db.Date)
+    dispatched_to_fsp_date = db.Column(db.Date)
+    dispatched_to_panasonic_date = db.Column(db.Date)
+    sc_number = db.Column(db.String(100))
+    job_number = db.Column(db.String(100))  # Can be blank initially
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 
 class AuditLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -50,34 +91,99 @@ class AuditLog(db.Model):
     old_values = db.Column(db.Text)
     new_values = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     user = db.relationship('User', backref='audit_logs')
     asset = db.relationship('Asset', backref='audit_logs')
+
+
+def migrate_database():
+    """Auto-migrate database to add missing columns"""
+    db_path = 'solar_assets.db'
+    if not os.path.exists(db_path):
+        return  # Database doesn't exist yet, will be created normally
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Check if new columns exist
+        cursor.execute("PRAGMA table_info(asset)")
+        columns = [column[1] for column in cursor.fetchall()]
+
+        new_columns = [
+            ('received_date', 'DATE'),
+            ('dispatched_to_fsp_date', 'DATE'),
+            ('dispatched_to_panasonic_date', 'DATE'),
+            ('sc_number', 'VARCHAR(100)'),
+            ('job_number', 'VARCHAR(100)')
+        ]
+
+        for column_name, column_type in new_columns:
+            if column_name not in columns:
+                cursor.execute(f'ALTER TABLE asset ADD COLUMN {column_name} {column_type}')
+                print(f"Added column: {column_name}")
+
+        conn.commit()
+
+    except Exception as e:
+        print(f"Migration error: {e}")
+        conn.rollback()
+    finally:
+        conn.close()
+
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+def get_status_color(status):
+    """Get Bootstrap color class for status badge"""
+    return STATUS_COLORS.get(status, 'secondary')
+
+
+# Make the function available in templates
+app.jinja_env.globals.update(get_status_color=get_status_color)
+app.jinja_env.globals.update(STATUS_OPTIONS=STATUS_OPTIONS)
+app.jinja_env.globals.update(ASSET_TYPE_OPTIONS=ASSET_TYPE_OPTIONS)
+
 
 # Routes
 @app.route('/')
 def index():
     if not current_user.is_authenticated:
         return redirect(url_for('login'))
-    
-    # Dashboard stats
+
+    # Dashboard stats with new status options
     total_assets = Asset.query.count()
-    in_service = Asset.query.filter_by(status='In Service').count()
-    under_repair = Asset.query.filter_by(status='Under Repair').count()
-    returned = Asset.query.filter_by(status='Returned').count()
-    
+    deployed = Asset.query.filter_by(status='Deployed').count()
+    with_panasonic = Asset.query.filter_by(status='With Panasonic for servicing').count()
+    with_fsp = Asset.query.filter_by(status='With FSP').count()
+    faulty_awaiting = Asset.query.filter(Asset.status.in_([
+        'Faulty awaiting RA',
+        'Faulty awaiting dispatch to Panasonic'
+    ])).count()
+
+    # Additional status counts for the breakdown
+    repaired = Asset.query.filter_by(status='Repaired').count()
+    unrepaired = Asset.query.filter_by(status='Unrepaired').count()
+    removed = Asset.query.filter_by(status='Removed (assumed working condition)').count()
+    disposed = Asset.query.filter_by(status='Disposed').count()
+
     recent_assets = Asset.query.order_by(Asset.updated_at.desc()).limit(10).all()
-    
-    return render_template('dashboard.html', 
-                         total_assets=total_assets,
-                         in_service=in_service,
-                         under_repair=under_repair,
-                         returned=returned,
-                         recent_assets=recent_assets)
+
+    return render_template('dashboard.html',
+                           total_assets=total_assets,
+                           deployed=deployed,
+                           with_panasonic=with_panasonic,
+                           with_fsp=with_fsp,
+                           faulty_awaiting=faulty_awaiting,
+                           repaired=repaired,
+                           unrepaired=unrepaired,
+                           removed=removed,
+                           disposed=disposed,
+                           recent_assets=recent_assets)
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -85,14 +191,15 @@ def login():
         username = request.form['username']
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
-        
+
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
             return redirect(url_for('index'))
         else:
             flash('Invalid username or password')
-    
+
     return render_template('login.html')
+
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -101,11 +208,11 @@ def register():
         email = request.form['email']
         password = request.form['password']
         company = request.form['company']
-        
+
         if User.query.filter_by(username=username).first():
             flash('Username already exists')
             return render_template('register.html')
-        
+
         user = User(
             username=username,
             email=email,
@@ -114,11 +221,12 @@ def register():
         )
         db.session.add(user)
         db.session.commit()
-        
+
         flash('Registration successful')
         return redirect(url_for('login'))
-    
+
     return render_template('register.html')
+
 
 @app.route('/logout')
 @login_required
@@ -126,26 +234,29 @@ def logout():
     logout_user()
     return redirect(url_for('login'))
 
+
 @app.route('/assets')
 @login_required
 def assets():
     page = request.args.get('page', 1, type=int)
     search = request.args.get('search', '')
     status_filter = request.args.get('status', '')
-    
+
     query = Asset.query
-    
+
     if search:
-        query = query.filter(Asset.serial_number.contains(search) | 
-                           Asset.manufacturer.contains(search) |
-                           Asset.model.contains(search))
-    
+        query = query.filter(Asset.serial_number.contains(search) |
+                             Asset.model.contains(search) |
+                             Asset.sc_number.contains(search) |
+                             Asset.job_number.contains(search))
+
     if status_filter:
         query = query.filter_by(status=status_filter)
-    
+
     assets = query.paginate(page=page, per_page=20, error_out=False)
-    
+
     return render_template('assets.html', assets=assets, search=search, status_filter=status_filter)
+
 
 @app.route('/asset/<int:id>')
 @login_required
@@ -154,6 +265,7 @@ def asset_detail(id):
     audit_logs = AuditLog.query.filter_by(asset_id=id).order_by(AuditLog.timestamp.desc()).limit(20).all()
     return render_template('asset_detail.html', asset=asset, audit_logs=audit_logs)
 
+
 @app.route('/asset/new', methods=['GET', 'POST'])
 @login_required
 def new_asset():
@@ -161,22 +273,25 @@ def new_asset():
         asset = Asset(
             serial_number=request.form['serial_number'],
             asset_type=request.form['asset_type'],
-            manufacturer=request.form['manufacturer'],
             model=request.form['model'],
             status=request.form['status'],
             location=request.form['location'],
-            notes=request.form['notes']
+            sc_number=request.form['sc_number'],
+            job_number=request.form['job_number'] if request.form['job_number'] else None
         )
-        
+
         # Handle dates
-        if request.form.get('install_date'):
-            asset.install_date = datetime.strptime(request.form['install_date'], '%Y-%m-%d').date()
-        if request.form.get('warranty_expiry'):
-            asset.warranty_expiry = datetime.strptime(request.form['warranty_expiry'], '%Y-%m-%d').date()
-        
+        if request.form.get('received_date'):
+            asset.received_date = datetime.strptime(request.form['received_date'], '%Y-%m-%d').date()
+        if request.form.get('dispatched_to_fsp_date'):
+            asset.dispatched_to_fsp_date = datetime.strptime(request.form['dispatched_to_fsp_date'], '%Y-%m-%d').date()
+        if request.form.get('dispatched_to_panasonic_date'):
+            asset.dispatched_to_panasonic_date = datetime.strptime(request.form['dispatched_to_panasonic_date'],
+                                                                   '%Y-%m-%d').date()
+
         db.session.add(asset)
         db.session.commit()
-        
+
         # Log the creation
         log = AuditLog(
             user_id=current_user.id,
@@ -186,40 +301,52 @@ def new_asset():
         )
         db.session.add(log)
         db.session.commit()
-        
+
         flash('Asset created successfully')
         return redirect(url_for('assets'))
-    
+
     return render_template('asset_form.html', asset=None)
+
 
 @app.route('/asset/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_asset(id):
     asset = Asset.query.get_or_404(id)
-    
+
     if request.method == 'POST':
         # Store old values for audit log
-        old_values = f"Status: {asset.status}, Location: {asset.location}"
-        
+        old_values = f"Status: {asset.status}, Location: {asset.location}, Job: {asset.job_number or 'None'}"
+
         asset.serial_number = request.form['serial_number']
         asset.asset_type = request.form['asset_type']
-        asset.manufacturer = request.form['manufacturer']
         asset.model = request.form['model']
         asset.status = request.form['status']
         asset.location = request.form['location']
-        asset.notes = request.form['notes']
+        asset.sc_number = request.form['sc_number']
+        asset.job_number = request.form['job_number'] if request.form['job_number'] else None
         asset.updated_at = datetime.utcnow()
-        
+
         # Handle dates
-        if request.form.get('install_date'):
-            asset.install_date = datetime.strptime(request.form['install_date'], '%Y-%m-%d').date()
-        if request.form.get('warranty_expiry'):
-            asset.warranty_expiry = datetime.strptime(request.form['warranty_expiry'], '%Y-%m-%d').date()
-        
-        new_values = f"Status: {asset.status}, Location: {asset.location}"
-        
+        if request.form.get('received_date'):
+            asset.received_date = datetime.strptime(request.form['received_date'], '%Y-%m-%d').date()
+        else:
+            asset.received_date = None
+
+        if request.form.get('dispatched_to_fsp_date'):
+            asset.dispatched_to_fsp_date = datetime.strptime(request.form['dispatched_to_fsp_date'], '%Y-%m-%d').date()
+        else:
+            asset.dispatched_to_fsp_date = None
+
+        if request.form.get('dispatched_to_panasonic_date'):
+            asset.dispatched_to_panasonic_date = datetime.strptime(request.form['dispatched_to_panasonic_date'],
+                                                                   '%Y-%m-%d').date()
+        else:
+            asset.dispatched_to_panasonic_date = None
+
+        new_values = f"Status: {asset.status}, Location: {asset.location}, Job: {asset.job_number or 'None'}"
+
         db.session.commit()
-        
+
         # Log the update
         log = AuditLog(
             user_id=current_user.id,
@@ -230,42 +357,46 @@ def edit_asset(id):
         )
         db.session.add(log)
         db.session.commit()
-        
+
         flash('Asset updated successfully')
         return redirect(url_for('asset_detail', id=id))
-    
+
     return render_template('asset_form.html', asset=asset)
+
 
 @app.route('/export/excel')
 @login_required
 def export_excel():
     assets = Asset.query.all()
-    
-    # Create DataFrame
+
+    # Create DataFrame with new fields
     data = []
     for asset in assets:
         data.append({
             'Serial Number': asset.serial_number,
-            'Type': asset.asset_type,
-            'Manufacturer': asset.manufacturer,
+            'Asset Type': asset.asset_type,
             'Model': asset.model,
             'Status': asset.status,
             'Location': asset.location,
-            'Install Date': asset.install_date.strftime('%Y-%m-%d') if asset.install_date else '',
-            'Warranty Expiry': asset.warranty_expiry.strftime('%Y-%m-%d') if asset.warranty_expiry else '',
-            'Notes': asset.notes or '',
+            'Received Date': asset.received_date.strftime('%Y-%m-%d') if asset.received_date else '',
+            'Dispatched to FSP Date': asset.dispatched_to_fsp_date.strftime(
+                '%Y-%m-%d') if asset.dispatched_to_fsp_date else '',
+            'Dispatched to Panasonic Date': asset.dispatched_to_panasonic_date.strftime(
+                '%Y-%m-%d') if asset.dispatched_to_panasonic_date else '',
+            'SC Number': asset.sc_number or '',
+            'Job Number': asset.job_number or '',
             'Created': asset.created_at.strftime('%Y-%m-%d %H:%M'),
             'Updated': asset.updated_at.strftime('%Y-%m-%d %H:%M')
         })
-    
+
     df = pd.DataFrame(data)
-    
+
     # Create Excel file in memory
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Assets')
     output.seek(0)
-    
+
     return send_file(
         output,
         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -273,24 +404,29 @@ def export_excel():
         download_name=f'solar_assets_{datetime.now().strftime("%Y%m%d")}.xlsx'
     )
 
+
 @app.route('/audit')
 @login_required
 def audit_trail():
     if current_user.role != 'admin':
         flash('Access denied')
         return redirect(url_for('index'))
-    
+
     page = request.args.get('page', 1, type=int)
     logs = AuditLog.query.order_by(AuditLog.timestamp.desc()).paginate(
         page=page, per_page=50, error_out=False)
-    
+
     return render_template('audit.html', logs=logs)
+
 
 # Initialize database
 def init_db():
     with app.app_context():
+        # Run migration first
+        migrate_database()
+
         db.create_all()
-        
+
         # Create admin user if it doesn't exist
         admin = User.query.filter_by(username='admin').first()
         if not admin:
@@ -305,6 +441,6 @@ def init_db():
             db.session.commit()
             print("Created admin user: admin/admin123")
 
+
 if __name__ == '__main__':
-    init_db()
-    app.run(debug=True)
+    app.run(debug=False)
